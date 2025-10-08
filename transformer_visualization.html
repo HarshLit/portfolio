@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Transformer & Attention Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .visualization-area {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .transformer-block {
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            padding: 20px;
+            background: #ecf0f1;
+        }
+        .attention-layer {
+            background: #e8f5e8;
+            border: 2px solid #27ae60;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .ffn-layer {
+            background: #ffeaa7;
+            border: 2px solid #fdcb6e;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .attention-matrix {
+            display: grid;
+            gap: 2px;
+            margin: 15px 0;
+            justify-content: center;
+        }
+        .attention-cell {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .attention-cell:hover {
+            transform: scale(1.2);
+            z-index: 10;
+            position: relative;
+        }
+        .tokens {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .token {
+            padding: 8px 12px;
+            background: #74b9ff;
+            color: white;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .token.active {
+            background: #0984e3;
+            transform: scale(1.1);
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #6c5ce7;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #5f3dc4;
+        }
+        button.active {
+            background: #a29bfe;
+        }
+        .explanation {
+            background: #f8f9fa;
+            border-left: 4px solid #6c5ce7;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .layer-label {
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .attention-heads {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .head {
+            flex: 1;
+            min-width: 150px;
+        }
+        .head-label {
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2d3436;
+        }
+        .arrow {
+            text-align: center;
+            font-size: 24px;
+            color: #6c5ce7;
+            margin: 10px 0;
+        }
+        .embeddings {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .embedding {
+            width: 20px;
+            height: 60px;
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+            border-radius: 3px;
+            position: relative;
+        }
+        .embedding:hover::after {
+            content: attr(data-value);
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2d3436;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Interactive Transformer & Attention Visualization</h1>
+        
+        <div class="controls">
+            <button onclick="setMode('attention')" class="active" id="attention-btn">Multi-Head Attention</button>
+            <button onclick="setMode('transformer')" id="transformer-btn">Full Transformer</button>
+            <button onclick="animateAttention()">Animate Attention</button>
+            <button onclick="resetVisualization()">Reset</button>
+        </div>
+
+        <div class="tokens" id="tokens">
+            <div class="token" onclick="selectToken(0)">The</div>
+            <div class="token" onclick="selectToken(1)">cat</div>
+            <div class="token" onclick="selectToken(2)">sat</div>
+            <div class="token" onclick="selectToken(3)">on</div>
+            <div class="token" onclick="selectToken(4)">mat</div>
+        </div>
+
+        <div class="visualization-area" id="visualization">
+            <!-- Content will be dynamically generated -->
+        </div>
+
+        <div class="explanation" id="explanation">
+            <strong>Multi-Head Attention:</strong> Click on tokens to see attention patterns. Each head focuses on different aspects of the relationships between words. Darker colors indicate stronger attention weights.
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'attention';
+        let selectedToken = 0;
+        let isAnimating = false;
+
+        // Sample attention weights for different heads
+        const attentionWeights = {
+            head1: [
+                [0.8, 0.1, 0.05, 0.03, 0.02],
+                [0.2, 0.6, 0.1, 0.08, 0.02],
+                [0.1, 0.3, 0.4, 0.15, 0.05],
+                [0.05, 0.15, 0.2, 0.5, 0.1],
+                [0.03, 0.07, 0.1, 0.3, 0.5]
+            ],
+            head2: [
+                [0.3, 0.2, 0.2, 0.2, 0.1],
+                [0.1, 0.4, 0.3, 0.15, 0.05],
+                [0.05, 0.25, 0.5, 0.15, 0.05],
+                [0.02, 0.08, 0.3, 0.4, 0.2],
+                [0.01, 0.04, 0.15, 0.3, 0.5]
+            ],
+            head3: [
+                [0.4, 0.3, 0.15, 0.1, 0.05],
+                [0.3, 0.3, 0.2, 0.15, 0.05],
+                [0.2, 0.2, 0.3, 0.2, 0.1],
+                [0.1, 0.1, 0.2, 0.4, 0.2],
+                [0.05, 0.05, 0.1, 0.3, 0.5]
+            ]
+        };
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.controls button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(mode + '-btn').classList.add('active');
+            renderVisualization();
+        }
+
+        function selectToken(index) {
+            selectedToken = index;
+            document.querySelectorAll('.token').forEach((token, i) => {
+                token.classList.toggle('active', i === index);
+            });
+            if (currentMode === 'attention') {
+                renderVisualization();
+            }
+        }
+
+        function getAttentionColor(weight) {
+            const intensity = Math.floor(weight * 255);
+            return `rgb(${255-intensity}, ${255-intensity}, 255)`;
+        }
+
+        function renderAttentionMatrix(weights, headName) {
+            const matrix = document.createElement('div');
+            matrix.className = 'attention-matrix';
+            matrix.style.gridTemplateColumns = 'repeat(5, 1fr)';
+            
+            for (let i = 0; i < 5; i++) {
+                for (let j = 0; j < 5; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'attention-cell';
+                    cell.style.background = getAttentionColor(weights[i][j]);
+                    cell.textContent = weights[i][j].toFixed(2);
+                    cell.title = `${headName}: Token ${i} → Token ${j} (${weights[i][j].toFixed(3)})`;
+                    
+                    if (i === selectedToken) {
+                        cell.style.border = '2px solid #e17055';
+                    }
+                    
+                    matrix.appendChild(cell);
+                }
+            }
+            
+            return matrix;
+        }
+
+        function renderEmbeddings() {
+            const container = document.createElement('div');
+            container.innerHTML = '<div class="layer-label">Input Embeddings</div>';
+            
+            const embeddings = document.createElement('div');
+            embeddings.className = 'embeddings';
+            
+            for (let i = 0; i < 20; i++) {
+                const emb = document.createElement('div');
+                emb.className = 'embedding';
+                emb.style.height = `${30 + Math.random() * 40}px`;
+                emb.setAttribute('data-value', (Math.random() * 2 - 1).toFixed(3));
+                embeddings.appendChild(emb);
+            }
+            
+            container.appendChild(embeddings);
+            return container;
+        }
+
+        function renderVisualization() {
+            const viz = document.getElementById('visualization');
+            viz.innerHTML = '';
+
+            if (currentMode === 'attention') {
+                const attentionBlock = document.createElement('div');
+                attentionBlock.className = 'attention-layer';
+                attentionBlock.innerHTML = '<div class="layer-label">Multi-Head Self-Attention</div>';
+
+                const headsContainer = document.createElement('div');
+                headsContainer.className = 'attention-heads';
+
+                ['head1', 'head2', 'head3'].forEach((head, index) => {
+                    const headDiv = document.createElement('div');
+                    headDiv.className = 'head';
+                    headDiv.innerHTML = `<div class="head-label">Head ${index + 1}</div>`;
+                    headDiv.appendChild(renderAttentionMatrix(attentionWeights[head], `Head ${index + 1}`));
+                    headsContainer.appendChild(headDiv);
+                });
+
+                attentionBlock.appendChild(headsContainer);
+                viz.appendChild(attentionBlock);
+
+                document.getElementById('explanation').innerHTML = 
+                    `<strong>Multi-Head Attention:</strong> Currently showing attention patterns for token "${document.querySelectorAll('.token')[selectedToken].textContent}". 
+                    Each head captures different types of relationships. Head 1 focuses on local dependencies, 
+                    Head 2 on syntactic relationships, and Head 3 on semantic connections.`;
+
+            } else if (currentMode === 'transformer') {
+                viz.appendChild(renderEmbeddings());
+                
+                const arrow1 = document.createElement('div');
+                arrow1.className = 'arrow';
+                arrow1.innerHTML = '↓';
+                viz.appendChild(arrow1);
+
+                const transformerBlock = document.createElement('div');
+                transformerBlock.className = 'transformer-block';
+                transformerBlock.innerHTML = '<div class="layer-label">Transformer Block</div>';
+
+                const attentionLayer = document.createElement('div');
+                attentionLayer.className = 'attention-layer';
+                attentionLayer.innerHTML = '<div class="layer-label">Multi-Head Self-Attention + Residual Connection</div>';
+                
+                const headsContainer = document.createElement('div');
+                headsContainer.className = 'attention-heads';
+                headsContainer.style.gap = '10px';
+
+                ['head1', 'head2', 'head3'].forEach((head, index) => {
+                    const headDiv = document.createElement('div');
+                    headDiv.className = 'head';
+                    headDiv.innerHTML = `<div class="head-label">Head ${index + 1}</div>`;
+                    const smallMatrix = renderAttentionMatrix(attentionWeights[head], `Head ${index + 1}`);
+                    smallMatrix.style.transform = 'scale(0.7)';
+                    headDiv.appendChild(smallMatrix);
+                    headsContainer.appendChild(headDiv);
+                });
+
+                attentionLayer.appendChild(headsContainer);
+                transformerBlock.appendChild(attentionLayer);
+
+                const ffnLayer = document.createElement('div');
+                ffnLayer.className = 'ffn-layer';
+                ffnLayer.innerHTML = `
+                    <div class="layer-label">Feed-Forward Network + Residual Connection</div>
+                    <div style="text-align: center; padding: 20px;">
+                        Linear(512 → 2048) → ReLU → Linear(2048 → 512)
+                    </div>
+                `;
+                transformerBlock.appendChild(ffnLayer);
+                
+                viz.appendChild(transformerBlock);
+
+                const arrow2 = document.createElement('div');
+                arrow2.className = 'arrow';
+                arrow2.innerHTML = '↓';
+                viz.appendChild(arrow2);
+
+                const outputEmbeddings = renderEmbeddings();
+                outputEmbeddings.querySelector('.layer-label').textContent = 'Output Representations';
+                viz.appendChild(outputEmbeddings);
+
+                document.getElementById('explanation').innerHTML = 
+                    `<strong>Full Transformer Block:</strong> Shows the complete flow: Input embeddings → Multi-head attention → 
+                    Feed-forward network → Output representations. Each layer includes residual connections and layer normalization.`;
+            }
+        }
+
+        function animateAttention() {
+            if (isAnimating) return;
+            isAnimating = true;
+            
+            let tokenIndex = 0;
+            const interval = setInterval(() => {
+                selectToken(tokenIndex);
+                tokenIndex = (tokenIndex + 1) % 5;
+                
+                if (tokenIndex === 0) {
+                    clearInterval(interval);
+                    isAnimating = false;
+                }
+            }, 1000);
+        }
+
+        function resetVisualization() {
+            selectedToken = 0;
+            selectToken(0);
+            setMode('attention');
+        }
+
+        // Initialize
+        selectToken(0);
+        renderVisualization();
+    </script>
+</body>
+</html>

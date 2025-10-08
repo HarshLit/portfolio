@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Transformer Architecture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .transformer-container {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 20px 0;
+        }
+        .encoder, .decoder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            min-width: 300px;
+        }
+        .section-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #34495e;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .layer {
+            width: 280px;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            border: 2px solid transparent;
+        }
+        .layer:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .layer.active {
+            border-color: #3498db;
+            transform: scale(1.05);
+        }
+        .multi-head-attention {
+            background: #e8f5e8;
+            border: 2px solid #27ae60;
+        }
+        .add-norm {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+        .feed-forward {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+        .masked-attention {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+        }
+        .cross-attention {
+            background: #e2e3e5;
+            border: 2px solid #6c757d;
+        }
+        .embedding {
+            background: #e7e3ff;
+            border: 2px solid #6f42c1;
+        }
+        .positional {
+            background: #fff0f5;
+            border: 2px solid #e83e8c;
+        }
+        .linear {
+            background: #f0f8ff;
+            border: 2px solid #007bff;
+        }
+        .softmax {
+            background: #f5f5f5;
+            border: 2px solid #343a40;
+        }
+        .arrow {
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 15px solid #6c757d;
+            margin: 5px 0;
+        }
+        .side-arrow {
+            width: 0;
+            height: 0;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            border-left: 15px solid #6c757d;
+            margin: 0 15px;
+            align-self: center;
+        }
+        .nx-label {
+            position: absolute;
+            right: -30px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #3498db;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .input-output {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .tokens {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .token {
+            padding: 8px 12px;
+            background: #74b9ff;
+            color: white;
+            border-radius: 15px;
+            font-size: 14px;
+        }
+        .explanation {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .attention-matrix {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 100;
+            display: none;
+            width: 200px;
+        }
+        .attention-matrix.show {
+            display: block;
+        }
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2px;
+            margin: 10px 0;
+        }
+        .matrix-cell {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            border-radius: 2px;
+            background: #ecf0f1;
+        }
+        .detail-panel {
+            background: #ffffff;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+        .detail-panel.show {
+            display: block;
+        }
+        .math-formula {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Interactive Transformer Architecture</h1>
+        
+        <div class="controls">
+            <button onclick="showFlow()">Show Data Flow</button>
+            <button onclick="showAttentionDetails()">Attention Details</button>
+            <button onclick="resetView()">Reset View</button>
+        </div>
+
+        <div class="transformer-container">
+            <!-- Encoder -->
+            <div class="encoder">
+                <div class="section-title">Encoder</div>
+                
+                <div class="layer multi-head-attention" onclick="showLayerDetails('encoder-attention')" data-layer="encoder-attention">
+                    Multi-Head Attention
+                    <div class="nx-label">Nx</div>
+                    <div class="attention-matrix" id="encoder-attention-matrix">
+                        <strong>Self-Attention</strong>
+                        <div class="matrix-grid" id="encoder-matrix-grid"></div>
+                        <div class="math-formula">Attention(Q,K,V) = softmax(QK^T/√d_k)V</div>
+                    </div>
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer add-norm" onclick="showLayerDetails('add-norm1')" data-layer="add-norm1">
+                    Add & Norm
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer feed-forward" onclick="showLayerDetails('feed-forward')" data-layer="feed-forward">
+                    Feed Forward
+                    <div class="nx-label">Nx</div>
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer add-norm" onclick="showLayerDetails('add-norm2')" data-layer="add-norm2">
+                    Add & Norm
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer positional" onclick="showLayerDetails('positional')" data-layer="positional">
+                    Positional Encoding
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer embedding" onclick="showLayerDetails('input-embedding')" data-layer="input-embedding">
+                    Input Embedding
+                </div>
+                
+                <div class="input-output">
+                    <strong>Inputs</strong>
+                    <div class="tokens">
+                        <div class="token">The</div>
+                        <div class="token">cat</div>
+                        <div class="token">sat</div>
+                        <div class="token">down</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Connection Arrow -->
+            <div class="side-arrow"></div>
+
+            <!-- Decoder -->
+            <div class="decoder">
+                <div class="section-title">Decoder</div>
+                
+                <div class="layer linear" onclick="showLayerDetails('linear')" data-layer="linear">
+                    Linear
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer softmax" onclick="showLayerDetails('softmax')" data-layer="softmax">
+                    Softmax
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer multi-head-attention" onclick="showLayerDetails('decoder-attention')" data-layer="decoder-attention">
+                    Multi-Head Attention
+                    <div class="nx-label">Nx</div>
+                    <div class="attention-matrix" id="decoder-attention-matrix">
+                        <strong>Cross-Attention</strong>
+                        <div class="matrix-grid" id="decoder-matrix-grid"></div>
+                        <div class="math-formula">Q from decoder, K,V from encoder</div>
+                    </div>
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer add-norm" onclick="showLayerDetails('add-norm3')" data-layer="add-norm3">
+                    Add & Norm
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer feed-forward" onclick="showLayerDetails('feed-forward-dec')" data-layer="feed-forward-dec">
+                    Feed Forward
+                    <div class="nx-label">Nx</div>
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer add-norm" onclick="showLayerDetails('add-norm4')" data-layer="add-norm4">
+                    Add & Norm
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer masked-attention" onclick="showLayerDetails('masked-attention')" data-layer="masked-attention">
+                    Masked Multi-Head Attention
+                    <div class="nx-label">Nx</div>
+                    <div class="attention-matrix" id="masked-attention-matrix">
+                        <strong>Masked Self-Attention</strong>
+                        <div class="matrix-grid" id="masked-matrix-grid"></div>
+                        <div class="math-formula">Prevents looking at future tokens</div>
+                    </div>
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer add-norm" onclick="showLayerDetails('add-norm5')" data-layer="add-norm5">
+                    Add & Norm
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer positional" onclick="showLayerDetails('positional-dec')" data-layer="positional-dec">
+                    Positional Encoding
+                </div>
+                
+                <div class="arrow"></div>
+                
+                <div class="layer embedding" onclick="showLayerDetails('output-embedding')" data-layer="output-embedding">
+                    Output Embedding
+                </div>
+                
+                <div class="input-output">
+                    <strong>Outputs (shifted right)</strong>
+                    <div class="tokens">
+                        <div class="token">&lt;start&gt;</div>
+                        <div class="token">Le</div>
+                        <div class="token">chat</div>
+                        <div class="token">s'est</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-panel" id="detail-panel">
+            <h3 id="detail-title">Layer Details</h3>
+            <div id="detail-content"></div>
+        </div>
+
+        <div class="explanation">
+            <h3>Interactive Transformer Architecture</h3>
+            <p><strong>Click on any layer</strong> to see detailed explanations and mathematical formulations.</p>
+            <p><strong>Encoder:</strong> Processes input sequence in parallel, building representations of the entire input.</p>
+            <p><strong>Decoder:</strong> Generates output sequence auto-regressively, attending to both previous outputs and encoder representations.</p>
+            <p><strong>Nx notation:</strong> Indicates that these layers are repeated N times (typically 6-12 times in practice).</p>
+        </div>
+    </div>
+
+    <script>
+        let currentActiveLayer = null;
+        let isFlowActive = false;
+
+        const layerDetails = {
+            'encoder-attention': {
+                title: 'Encoder Multi-Head Attention',
+                content: `
+                    <p><strong>Purpose:</strong> Allows each position to attend to all positions in the input sequence.</p>
+                    <div class="math-formula">
+                        MultiHead(Q,K,V) = Concat(head₁,...,headₕ)W^O<br>
+                        where headᵢ = Attention(QWᵢ^Q, KWᵢ^K, VWᵢ^V)
+                    </div>
+                    <p><strong>Key Features:</strong></p>
+                    <ul>
+                        <li>8 attention heads (typically)</li>
+                        <li>Each head has dimension d_k = d_model/h = 64</li>
+                        <li>Enables the model to jointly attend to information from different representation subspaces</li>
+                    </ul>
+                `
+            },
+            'add-norm1': {
+                title: 'Add & Norm (Residual Connection)',
+                content: `
+                    <p><strong>Purpose:</strong> Combines input with attention output and normalizes.</p>
+                    <div class="math-formula">
+                        LayerNorm(x + MultiHeadAttention(x))
+                    </div>
+                    <p><strong>Benefits:</strong></p>
+                    <ul>
+                        <li>Residual connections help with gradient flow</li>
+                        <li>Layer normalization stabilizes training</li>
+                        <li>Applied before each sub-layer (Pre-LN)</li>
+                    </ul>
+                `
+            },
+            'feed-forward': {
+                title: 'Feed Forward Network',
+                content: `
+                    <p><strong>Purpose:</strong> Applies position-wise transformations to each position separately.</p>
+                    <div class="math-formula">
+                        FFN(x) = max(0, xW₁ + b₁)W₂ + b₂
+                    </div>
+                    <p><strong>Architecture:</strong></p>
+                    <ul>
+                        <li>Two linear transformations with ReLU activation</li>
+                        <li>Inner dimension: 2048 (4x the model dimension)</li>
+                        <li>Same across all positions but different across layers</li>
+                    </ul>
+                `
+            },
+            'masked-attention': {
+                title: 'Masked Multi-Head Attention',
+                content: `
+                    <p><strong>Purpose:</strong> Self-attention with masking to prevent positions from attending to subsequent positions.</p>
+                    <div class="math-formula">
+                        Attention(Q,K,V) = softmax(QK^T/√d_k + M)V<br>
+                        where M_{ij} = -∞ if i < j, else 0
+                    </div>
+                    <p><strong>Key Features:</strong></p>
+                    <ul>
+                        <li>Ensures auto-regressive property</li>
+                        <li>Prevents information leakage from future tokens</li>
+                        <li>Essential for proper sequence generation</li>
+                    </ul>
+                `
+            },
+            'positional': {
+                title: 'Positional Encoding',
+                content: `
+                    <p><strong>Purpose:</strong> Adds information about the position of tokens in the sequence.</p>
+                    <div class="math-formula">
+                        PE(pos,2i) = sin(pos/10000^(2i/d_model))<br>
+                        PE(pos,2i+1) = cos(pos/10000^(2i/d_model))
+                    </div>
+                    <p><strong>Properties:</strong></p>
+                    <ul>
+                        <li>Sinusoidal functions for different frequencies</li>
+                        <li>Allows model to learn relative positions</li>
+                        <li>No learned parameters</li>
+                    </ul>
+                `
+            },
+            'input-embedding': {
+                title: 'Input Embedding',
+                content: `
+                    <p><strong>Purpose:</strong> Converts input tokens to dense vectors.</p>
+                    <div class="math-formula">
+                        Embedding: ℝ^|V| → ℝ^d_model
+                    </div>
+                    <p><strong>Details:</strong></p>
+                    <ul>
+                        <li>Learned embedding matrix of size |V| × d_model</li>
+                        <li>Shared with output embedding (with √d_model scaling)</li>
+                        <li>d_model = 512 in base model</li>
+                    </ul>
+                `
+            }
+        };
+
+        function showLayerDetails(layerId) {
+            // Hide all attention matrices
+            document.querySelectorAll('.attention-matrix').forEach(matrix => {
+                matrix.classList.remove('show');
+            });
+
+            // Remove active class from all layers
+            document.querySelectorAll('.layer').forEach(layer => {
+                layer.classList.remove('active');
+            });
+
+            // Show attention matrix for attention layers
+            if (layerId.includes('attention')) {
+                const matrix = document.getElementById(layerId + '-matrix');
+                if (matrix) {
+                    matrix.classList.add('show');
+                    generateAttentionMatrix(layerId);
+                }
+            }
+
+            // Add active class to clicked layer
+            const clickedLayer = document.querySelector(`[data-layer="${layerId}"]`);
+            if (clickedLayer) {
+                clickedLayer.classList.add('active');
+            }
+
+            // Show detail panel
+            const detailPanel = document.getElementById('detail-panel');
+            const detailTitle = document.getElementById('detail-title');
+            const detailContent = document.getElementById('detail-content');
+
+            if (layerDetails[layerId]) {
+                detailTitle.textContent = layerDetails[layerId].title;
+                detailContent.innerHTML = layerDetails[layerId].content;
+                detailPanel.classList.add('show');
+            }
+
+            currentActiveLayer = layerId;
+        }
+
+        function generateAttentionMatrix(layerId) {
+            const gridId = layerId.replace('-attention', '-matrix-grid');
+            const grid = document.getElementById(gridId);
+            if (!grid) return;
+
+            grid.innerHTML = '';
+            
+            // Generate sample attention weights
+            for (let i = 0; i < 16; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'matrix-cell';
+                
+                let weight;
+                if (layerId === 'masked-attention') {
+                    // Lower triangle matrix for masked attention
+                    const row = Math.floor(i / 4);
+                    const col = i % 4;
+                    weight = col <= row ? Math.random() : 0;
+                } else {
+                    weight = Math.random();
+                }
+                
+                const intensity = Math.floor(weight * 255);
+                cell.style.background = `rgb(${255-intensity}, ${255-intensity}, 255)`;
+                cell.textContent = weight.toFixed(1);
+                grid.appendChild(cell);
+            }
+        }
+
+        function showFlow() {
+            isFlowActive = !isFlowActive;
+            const layers = document.querySelectorAll('.layer');
+            
+            if (isFlowActive) {
+                let delay = 0;
+                layers.forEach(layer => {
+                    setTimeout(() => {
+                        layer.style.background = '#3498db';
+                        layer.style.color = 'white';
+                        setTimeout(() => {
+                            layer.style.background = '';
+                            layer.style.color = '';
+                        }, 500);
+                    }, delay);
+                    delay += 200;
+                });
+            }
+        }
+
+        function showAttentionDetails() {
+            const attentionLayers = document.querySelectorAll('.multi-head-attention, .masked-attention');
+            attentionLayers.forEach(layer => {
+                layer.style.border = '3px solid #e74c3c';
+                setTimeout(() => {
+                    layer.style.border = '';
+                }, 2000);
+            });
+        }
+
+        function resetView() {
+            document.querySelectorAll('.layer').forEach(layer => {
+                layer.classList.remove('active');
+            });
+            document.querySelectorAll('.attention-matrix').forEach(matrix => {
+                matrix.classList.remove('show');
+            });
+            document.getElementById('detail-panel').classList.remove('show');
+            currentActiveLayer = null;
+        }
+
+        // Initialize with some sample data
+        document.addEventListener('DOMContentLoaded', function() {
+            // Pre-populate some attention matrices
+            generateAttentionMatrix('encoder-attention');
+            generateAttentionMatrix('decoder-attention');
+            generateAttentionMatrix('masked-attention');
+        });
+    </script>
+</body>
+</html>

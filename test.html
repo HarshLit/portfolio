@@ -1,0 +1,1603 @@
+// Interactive Transformer Game
+        class TransformerGame {
+            constructor() {
+                this.score = 0;
+                this.level = 1;
+                this.streak = 0;
+                this.currentChallenge = null;
+                this.gameType = 'sentence_building';
+                this.challenges = this.initializeChallenges();
+                this.currentChallengeIndex = 0;
+                
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.loadChallenge();
+                this.updateUI();
+            }
+            
+            initializeChallenges() {
+                return [
+                    // Level 1: Basic sentence completion
+                    {
+                        type: 'sentence_building',
+                        level: 1,
+                        target: 'The cat sat on the mat',
+                        words: ['The', 'cat', 'on', 'sat', 'mat', 'the'],
+                        explanation: 'Transformers use attention to understand word relationships. Notice how "cat" and "sat" are connected!'
+                    },
+                    {
+                        type: 'sentence_building',
+                        level: 1,
+                        target: 'I love machine learning',
+                        words: ['love', 'I', 'learning', 'machine'],
+                        explanation: 'The model learns that "machine" and "learning" often appear together through attention patterns.'
+                    },
+                    {
+                        type: 'attention_prediction',
+                        level: 2,
+                        sentence: 'The quick brown fox jumps',
+                        query_word: 'fox',
+                        correct_attention: ['quick', 'brown'],
+                        explanation: 'Adjectives like "quick" and "brown" have strong attention connections to nouns like "fox".'
+                    },
+                    {
+                        type: 'sentence_building',
+                        level: 2,
+                        target: 'Artificial intelligence transforms the world',
+                        words: ['world', 'intelligence', 'the', 'Artificial', 'transforms'],
+                        explanation: 'Complex sentences require the transformer to maintain long-range dependencies between distant words.'
+                    },
+                    {
+                        type: 'context_prediction',
+                        level: 3,
+                        context: 'The weather is beautiful today. I think I will go to the',
+                        options: ['park', 'refrigerator', 'database', 'cloud'],
+                        correct: 'park',
+                        explanation: 'Transformers use context from previous sentences to predict the most likely next word.'
+                    },
+                    {
+                        type: 'attention_prediction',
+                        level: 3,
+                        sentence: 'The programmer debugged the complex algorithm efficiently',
+                        query_word: 'algorithm',
+                        correct_attention: ['complex', 'debugged'],
+                        explanation: 'Technical terms create strong attention patterns with related concepts and actions.'
+                    }
+                ];
+            }
+            
+            setupEventListeners() {
+                const checkBtn = document.getElementById('checkBtn');
+                const hintBtn = document.getElementById('hintBtn');
+                const skipBtn = document.getElementById('skipBtn');
+                const nextBtn = document.getElementById('nextBtn');
+                
+                if (checkBtn) checkBtn.addEventListener('click', () => this.checkAnswer());
+                if (hintBtn) hintBtn.addEventListener('click', () => this.showHint());
+                if (skipBtn) skipBtn.addEventListener('click', () => this.skipChallenge());
+                if (nextBtn) nextBtn.addEventListener('click', () => this.nextChallenge());
+            }
+            
+            loadChallenge() {
+                if (this.currentChallengeIndex >= this.challenges.length) {
+                    this.showVictory();
+                    return;
+                }
+                
+                this.currentChallenge = this.challenges[this.currentChallengeIndex];
+                const gameContainer = document.getElementById('currentGame');
+                
+                if (!gameContainer) return;
+                
+                // Update scenario based on challenge type
+                this.updateScenario();
+                
+                // Clear previous game
+                gameContainer.innerHTML = '';
+                
+                // Load appropriate game type
+                switch (this.currentChallenge.type) {
+                    case 'sentence_building':
+                        this.loadSentenceBuilding(gameContainer);
+                        break;
+                    case 'attention_prediction':
+                        this.loadAttentionPrediction(gameContainer);
+                        break;
+                    case 'context_prediction':
+                        this.loadContextPrediction(gameContainer);
+                        break;
+                }
+                
+                // Hide next button
+                const nextBtn = document.getElementById('nextBtn');
+                if (nextBtn) nextBtn.style.display = 'none';
+            }
+            
+            updateScenario() {
+                const scenarioEl = document.getElementById('gameScenario');
+                if (!scenarioEl) return;
+                
+                const scenarios = {
+                    'sentence_building': {
+                        title: '🔤 Mission: Build the Sentence',
+                        text: 'Arrange the words in the correct order. See how transformers understand sentence structure!'
+                    },
+                    'attention_prediction': {
+                        title: '🎯 Mission: Predict Attention',
+                        text: 'Click on words that the highlighted word should pay attention to. Think like a transformer!'
+                    },
+                    'context_prediction': {
+                        title: '🧠 Mission: Context Understanding',
+                        text: 'Choose the word that best completes the sentence based on context. Use transformer reasoning!'
+                    }
+                };
+                
+                const scenario = scenarios[this.currentChallenge.type];
+                scenarioEl.innerHTML = `
+                    <div class="scenario-title">${scenario.title}</div>
+                    <div class="scenario-text">${scenario.text}</div>
+                `;
+            }
+            
+            loadSentenceBuilding(container) {
+                const challenge = this.currentChallenge;
+                
+                container.innerHTML = `
+                    <div class="word-game">
+                        <div class="scenario-text">Target: "${challenge.target}"</div>
+                        <div class="sentence-builder" id="sentenceBuilder">
+                            <span style="color: rgba(255,255,255,0.5); font-style: italic;">Drop words here...</span>
+                        </div>
+                        <div class="word-bank" id="wordBank"></div>
+                    </div>
+                `;
+                
+                const wordBank = document.getElementById('wordBank');
+                const sentenceBuilder = document.getElementById('sentenceBuilder');
+                
+                // Shuffle words
+                const shuffled = [...challenge.words].sort(() => Math.random() - 0.5);
+                
+                shuffled.forEach(word => {
+                    const wordChip = document.createElement('div');
+                    wordChip.className = 'word-chip';
+                    wordChip.textContent = word;
+                    wordChip.draggable = true;
+                    
+                    wordChip.addEventListener('click', () => this.moveWordToSentence(word, wordChip, sentenceBuilder, wordBank));
+                    wordBank.appendChild(wordChip);
+                });
+                
+                // Make sentence builder accept words
+                sentenceBuilder.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('word-chip')) {
+                        this.moveWordToBank(e.target.textContent, e.target, wordBank, sentenceBuilder);
+                    }
+                });
+            }
+            
+            loadAttentionPrediction(container) {
+                const challenge = this.currentChallenge;
+                
+                container.innerHTML = `
+                    <div class="attention-playground">
+                        <div class="scenario-text">Click on words that "${challenge.query_word}" should pay attention to:</div>
+                        <div class="attention-sentence" id="attentionSentence"></div>
+                        <div style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;">
+                            Query word is highlighted in pink. Click on related words!
+                        </div>
+                    </div>
+                `;
+                
+                const sentence = document.getElementById('attentionSentence');
+                const words = challenge.sentence.split(' ');
+                
+                words.forEach(word => {
+                    const wordEl = document.createElement('div');
+                    wordEl.className = 'attention-word';
+                    wordEl.textContent = word;
+                    
+                    if (word === challenge.query_word) {
+                        wordEl.classList.add('query');<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harshit - AI Engineer & Python Developer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+            z-index: -1;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            z-index: -1;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-30px) rotate(1deg); }
+            66% { transform: translateY(-20px) rotate(-1deg); }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .logo-image {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: #667eea;
+        }
+
+        /* Hero Section */
+        .hero {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 25% 25%, rgba(100, 200, 255, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 75% 75%, rgba(255, 100, 200, 0.1) 0%, transparent 40%),
+                linear-gradient(45deg, transparent 40%, rgba(120, 119, 198, 0.05) 50%, transparent 60%);
+            animation: heroFloat 15s ease-in-out infinite;
+        }
+
+        /* Interactive Transformer Game */
+        .transformer-game {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 450px;
+            height: 600px;
+            background: rgba(0, 0, 0, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
+            font-size: 0.9rem;
+            overflow-y: auto;
+        }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        .game-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .game-subtitle {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .game-stats {
+            display: flex;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .stat {
+            text-align: center;
+            color: white;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            opacity: 0.8;
+        }
+
+        .game-scenario {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 3px solid #4CAF50;
+        }
+
+        .scenario-title {
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 8px;
+        }
+
+        .scenario-text {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            margin-bottom: 10px;
+        }
+
+        .word-game {
+            margin: 15px 0;
+        }
+
+        .sentence-builder {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            min-height: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            margin-bottom: 10px;
+        }
+
+        .word-bank {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .word-chip {
+            background: rgba(120, 219, 255, 0.3);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            border: 1px solid rgba(120, 219, 255, 0.5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .word-chip:hover {
+            background: rgba(120, 219, 255, 0.6);
+            transform: scale(1.05);
+        }
+
+        .word-chip.used {
+            background: rgba(100, 100, 100, 0.3);
+            border-color: rgba(100, 100, 100, 0.5);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .word-chip.correct {
+            background: rgba(76, 175, 80, 0.6);
+            border-color: rgba(76, 175, 80, 0.8);
+            animation: correctPulse 0.5s ease;
+        }
+
+        .word-chip.incorrect {
+            background: rgba(244, 67, 54, 0.6);
+            border-color: rgba(244, 67, 54, 0.8);
+            animation: incorrectShake 0.5s ease;
+        }
+
+        @keyframes correctPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        @keyframes incorrectShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .attention-playground {
+            margin: 15px 0;
+        }
+
+        .attention-sentence {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .attention-word {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            border: 2px solid transparent;
+        }
+
+        .attention-word:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .attention-word.query {
+            background: rgba(255, 119, 198, 0.6);
+            border-color: rgba(255, 119, 198, 0.8);
+            box-shadow: 0 0 15px rgba(255, 119, 198, 0.4);
+        }
+
+        .attention-word.attending {
+            background: rgba(120, 219, 255, 0.6);
+            border-color: rgba(120, 219, 255, 0.8);
+            animation: attendingPulse 1s ease-in-out infinite;
+        }
+
+        @keyframes attendingPulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .game-controls {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .game-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 80px;
+        }
+
+        .game-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .game-btn.primary {
+            background: rgba(120, 219, 255, 0.3);
+            border-color: rgba(120, 219, 255, 0.5);
+        }
+
+        .game-btn.success {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .game-feedback {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+        }
+
+        .feedback-text {
+            font-size: 0.8rem;
+            line-height: 1.4;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .level-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .level-badge {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            border-radius: 3px;
+        }
+
+        .mini-game {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .challenge-timer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            color: #FFE66D;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .transformer-game {
+                position: relative;
+                top: auto;
+                right: auto;
+                width: 100%;
+                max-width: 400px;
+                margin: 20px auto;
+                height: auto;
+                max-height: 500px;
+            }
+        }
+
+        .hero-content {
+            z-index: 2;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            animation: fadeInUp 1s ease;
+        }
+
+        .hero .subtitle {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            animation: fadeInUp 1s ease 0.2s both;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 12px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            animation: fadeInUp 1s ease 0.4s both;
+        }
+
+        .cta-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* Sections */
+        .section {
+            padding: 80px 0;
+            background: white;
+        }
+
+        .section:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            color: #333;
+            position: relative;
+        }
+
+        .section-title::after {
+            content: '';
+            display: block;
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            margin: 20px auto;
+            border-radius: 2px;
+        }
+
+        /* About Section */
+        .about-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .about-image {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 4rem;
+            font-weight: bold;
+            margin: 0 auto;
+        }
+
+        .about-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+        }
+
+        /* Skills Section */
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .skill-category {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .skill-category:hover {
+            transform: translateY(-5px);
+        }
+
+        .skill-category h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .skill-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .skill-tag {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.9rem;
+        }
+
+        /* Projects Section */
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .project-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .project-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+
+        .project-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 1.5rem;
+        }
+
+        .project-content {
+            padding: 1.5rem;
+        }
+
+        .project-title {
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .project-description {
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .project-tech {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .tech-tag {
+            background: #f1f3f4;
+            color: #333;
+            padding: 0.2rem 0.6rem;
+            border-radius: 10px;
+            font-size: 0.8rem;
+        }
+
+        /* Experience Section */
+        .timeline {
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            transform: translateX(-50%);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 3rem;
+            width: 50%;
+        }
+
+        .timeline-item:nth-child(odd) {
+            left: 0;
+            padding-right: 2rem;
+        }
+
+        .timeline-item:nth-child(even) {
+            left: 50%;
+            padding-left: 2rem;
+        }
+
+        .timeline-content {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .timeline-date {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        /* Contact Section */
+        .contact-content {
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .contact-info {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .contact-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        /* Footer */
+        .footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .about-content {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .timeline::before {
+                left: 20px;
+            }
+
+            .timeline-item {
+                width: 100%;
+                left: 0 !important;
+                padding-left: 3rem !important;
+                padding-right: 0 !important;
+            }
+
+            .contact-info {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Scroll animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="nav container">
+            <div class="logo">
+                <div class="logo-image">H</div>
+                <span>Harshit</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#about">About</a></li>
+                <li><a href="#skills">Skills</a></li>
+                <li><a href="#projects">Projects</a></li>
+                <li><a href="#experience">Experience</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="floating-icons">🤖 🧠 💡 🔬 📊 ⚡ 🎯 🚀</div>
+        
+        <!-- Interactive Transformer Game -->
+        <div class="transformer-game">
+            <div class="game-header">
+                <div class="game-title">🎮 Transformer Academy</div>
+                <div class="game-subtitle">Learn by playing with AI language models</div>
+            </div>
+            
+            <div class="level-indicator">
+                <div class="level-badge" id="levelBadge">Level 1</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="game-stats">
+                <div class="stat">
+                    <div class="stat-value" id="scoreValue">0</div>
+                    <div class="stat-label">Score</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="streakValue">0</div>
+                    <div class="stat-label">Streak</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="levelValue">1</div>
+                    <div class="stat-label">Level</div>
+                </div>
+            </div>
+            
+            <div class="game-scenario" id="gameScenario">
+                <div class="scenario-title">🎯 Mission: Complete the Sentence</div>
+                <div class="scenario-text">
+                    Help the transformer understand context by arranging words in the correct order. 
+                    Watch how attention flows between words!
+                </div>
+            </div>
+            
+            <div class="mini-game" id="currentGame">
+                <!-- Game content will be dynamically loaded here -->
+            </div>
+            
+            <div class="game-controls">
+                <button class="game-btn primary" id="checkBtn">✓ Check Answer</button>
+                <button class="game-btn" id="hintBtn">💡 Hint</button>
+                <button class="game-btn" id="skipBtn">⏭️ Skip</button>
+                <button class="game-btn success" id="nextBtn" style="display: none;">➡️ Next</button>
+            </div>
+            
+            <div class="game-feedback" id="gameFeedback">
+                <div class="feedback-text">
+                    Drag words from the bank below to complete the sentence. Pay attention to how transformers use context!
+                </div>
+            </div>
+        </div>
+
+        <div class="container hero-content">
+            <h1>Harshit</h1>
+            <p class="subtitle">AI Engineer & Python Developer</p>
+            <p class="subtitle">Specializing in Generative AI, RAG Systems, and LLM Integration</p>
+            <a href="#contact" class="cta-button">Get In Touch</a>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="section">
+        <div class="container">
+            <h2 class="section-title fade-in">About Me</h2>
+            <div class="about-content fade-in">
+                <div class="about-image">H</div>
+                <div class="about-text">
+                    <p>Python developer with two years of specialized experience building production-ready AI applications for legal document processing and business intelligence. My expertise spans RAG system architecture, LLM integration, and vector database implementation with demonstrated success in reducing processing times by 90% and operational costs by 40%.</p>
+                    
+                    <p>I have a strong background in full-stack development with FastAPI, machine learning model fine-tuning, and enterprise system integration across retail, financial, and legal technology sectors. My approach focuses on building maintainable, scalable systems with emphasis on performance monitoring and explainability in AI applications.</p>
+                    
+                    <p>Currently working as a Software Engineer at Appzlogic Mobility Solutions, where I architect AI solutions for clients across multiple industries, with particular focus on document processing and conversational systems.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Skills Section -->
+    <section id="skills" class="section">
+        <div class="container">
+            <h2 class="section-title fade-in">Technical Skills</h2>
+            <div class="skills-grid fade-in">
+                <div class="skill-category">
+                    <h3>AI/ML Frameworks</h3>
+                    <div class="skill-tags">
+                        <span class="skill-tag">LangChain</span>
+                        <span class="skill-tag">LangGraph</span>
+                        <span class="skill-tag">PyTorch</span>
+                        <span class="skill-tag">Transformers</span>
+                        <span class="skill-tag">Llama.cpp</span>
+                    </div>
+                </div>
+                <div class="skill-category">
+                    <h3>Programming Languages</h3>
+                    <div class="skill-tags">
+                        <span class="skill-tag">Python</span>
+                        <span class="skill-tag">JavaScript</span>
+                        <span class="skill-tag">Node.js</span>
+                    </div>
+                </div>
+                <div class="skill-category">
+                    <h3>Web Development</h3>
+                    <div class="skill-tags">
+                        <span class="skill-tag">FastAPI</span>
+                        <span class="skill-tag">Flask</span>
+                        <span class="skill-tag">Streamlit</span>
+                        <span class="skill-tag">Gradio</span>
+                    </div>
+                </div>
+                <div class="skill-category">
+                    <h3>Databases</h3>
+                    <div class="skill-tags">
+                        <span class="skill-tag">FAISS</span>
+                        <span class="skill-tag">Milvus</span>
+                        <span class="skill-tag">ChromaDB</span>
+                        <span class="skill-tag">SQL</span>
+                    </div>
+                </div>
+                <div class="skill-category">
+                    <h3>Cloud Platforms</h3>
+                    <div class="skill-tags">
+                        <span class="skill-tag">Azure AI</span>
+                        <span class="skill-tag">Microsoft 365</span>
+                    </div>
+                </div>
+                <div class="skill-category">
+                    <h3>Specializations</h3>
+                    <div class="skill-tags">
+                        <span class="skill-tag">RAG Architecture</span>
+                        <span class="skill-tag">LLM Fine-tuning</span>
+                        <span class="skill-tag">Prompt Engineering</span>
+                        <span class="skill-tag">Embedding Systems</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="section">
+        <div class="container">
+            <h2 class="section-title fade-in">Key Projects</h2>
+            <div class="projects-grid fade-in">
+                <div class="project-card">
+                    <div class="project-header">
+                        <h3 class="project-title">DigiDossier - Legal Workflow System</h3>
+                    </div>
+                    <div class="project-content">
+                        <p class="project-description">Developed agentic AI workflow for automated legal document processing and query handling using tool-based knowledge integration. Built LangGraph workflow with conditional routing to dynamically adapt processing steps based on document complexity.</p>
+                        <div class="project-tech">
+                            <span class="tech-tag">LangGraph</span>
+                            <span class="tech-tag">LangChain</span>
+                            <span class="tech-tag">Python</span>
+                            <span class="tech-tag">Vector DB</span>
+                        </div>
+                        <p><strong>Impact:</strong> Reduced legal expert workload by 90%</p>
+                    </div>
+                </div>
+
+                <div class="project-card">
+                    <div class="project-header">
+                        <h3 class="project-title">Pathways - Business Intelligence AI</h3>
+                    </div>
+                    <div class="project-content">
+                        <p class="project-description">Engineered real-time market analysis system utilizing Google Gemini API and custom web scrapers for comprehensive business intelligence. Implemented socket-based progress tracking for long-running analysis tasks.</p>
+                        <div class="project-tech">
+                            <span class="tech-tag">Google Gemini</span>
+                            <span class="tech-tag">Web Scraping</span>
+                            <span class="tech-tag">Socket.io</span>
+                            <span class="tech-tag">FastAPI</span>
+                        </div>
+                        <p><strong>Features:</strong> Real-time analysis, Resume parsing with Gemma model</p>
+                    </div>
+                </div>
+
+                <div class="project-card">
+                    <div class="project-header">
+                        <h3 class="project-title">ImagesBazaar - Visual Search Engine</h3>
+                    </div>
+                    <div class="project-content">
+                        <p class="project-description">Implemented image similarity search using ResNet model for embedding generation, achieving 95% user satisfaction in similar image retrieval. Created custom vector database integration with sub-second query response times.</p>
+                        <div class="project-tech">
+                            <span class="tech-tag">ResNet</span>
+                            <span class="tech-tag">Vector Search</span>
+                            <span class="tech-tag">PyTorch</span>
+                            <span class="tech-tag">FAISS</span>
+                        </div>
+                        <p><strong>Performance:</strong> 95% accuracy, Sub-second response times</p>
+                    </div>
+                </div>
+
+                <div class="project-card">
+                    <div class="project-header">
+                        <h3 class="project-title">IndiaForNRI - Legal Query System</h3>
+                    </div>
+                    <div class="project-content">
+                        <p class="project-description">Designed comprehensive RAG architecture using LangChain and Milvus vector database for NRI-specific legal document processing. Implemented hybrid search combining vector similarity and keyword matching.</p>
+                        <div class="project-tech">
+                            <span class="tech-tag">LangChain</span>
+                            <span class="tech-tag">Milvus</span>
+                            <span class="tech-tag">RAG</span>
+                            <span class="tech-tag">NLP</span>
+                        </div>
+                        <p><strong>Optimization:</strong> 200ms response time, 40% cost reduction</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Experience Section -->
+    <section id="experience" class="section">
+        <div class="container">
+            <h2 class="section-title fade-in">Professional Experience</h2>
+            <div class="timeline fade-in">
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <div class="timeline-date">Sep 2023 - Present</div>
+                        <h3>Software Engineer</h3>
+                        <h4>Appzlogic Mobility Solutions</h4>
+                        <p>Architected RAG-based document processing systems using LangChain and vector databases, achieving 200ms average query response time while handling 10,000+ monthly queries. Built production APIs serving five active client integrations with 99.8% uptime.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <div class="timeline-date">2022 - 2023</div>
+                        <h3>Research Analyst</h3>
+                        <h4>6w Research</h4>
+                        <p>Developed machine learning algorithms for financial market forecasting, achieving 15-20% improvement in prediction accuracy over baseline statistical models. Implemented automated data extraction pipelines processing real-time market feeds.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <div class="timeline-date">2021 - 2022</div>
+                        <h3>Senior Executive</h3>
+                        <h4>Reliance Retail</h4>
+                        <p>Developed predictive models for demand forecasting using statistical methods and historical sales analysis. Implemented data-driven algorithms for inventory optimization, achieving 25% reduction in stockout instances.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="section">
+        <div class="container">
+            <h2 class="section-title fade-in">Get In Touch</h2>
+            <div class="contact-content fade-in">
+                <p>I'm always interested in discussing new opportunities, collaborations, or innovative AI projects. Feel free to reach out if you'd like to connect.</p>
+                
+                <div class="contact-info">
+                    <div class="contact-item">
+                        <div class="contact-icon">📧</div>
+                        <span>your.email@example.com</span>
+                    </div>
+                    <div class="contact-item">
+                        <div class="contact-icon">📱</div>
+                        <span>+91 XXXXX XXXXX</span>
+                    </div>
+                    <div class="contact-item">
+                        <div class="contact-icon">💼</div>
+                        <a href="https://linkedin.com/in/your-profile" target="_blank" style="color: inherit; text-decoration: none;">LinkedIn Profile</a>
+                    </div>
+                    <div class="contact-item">
+                        <div class="contact-icon">🌐</div>
+                        <a href="https://github.com/your-username" target="_blank" style="color: inherit; text-decoration: none;">GitHub Profile</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Harshit. All rights reserved. Built with passion for AI and innovation.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Header background change on scroll
+        window.addEventListener('scroll', function() {
+            const header = document.querySelector('.header');
+            if (window.scrollY > 100) {
+                header.style.background = 'rgba(255, 255, 255, 0.98)';
+                header.style.boxShadow = '0 2px 20px rgba(0,0,0,0.1)';
+            } else {
+                header.style.background = 'rgba(255, 255, 255, 0.95)';
+                header.style.boxShadow = 'none';
+            }
+        });
+
+        // Intersection Observer for fade-in animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        // Observe all fade-in elements
+        document.querySelectorAll('.fade-in').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Add typing effect to hero subtitle
+        const subtitle = document.querySelector('.hero .subtitle');
+        const text = subtitle.textContent;
+        subtitle.textContent = '';
+        
+        let i = 0;
+        function typeWriter() {
+            if (i < text.length) {
+                subtitle.textContent += text.charAt(i);
+                i++;
+                setTimeout(typeWriter, 50);
+            }
+        }
+        
+        // Start typing effect after hero animation
+        setTimeout(typeWriter, 1000);
+
+        // Add floating animation to skill tags
+        document.querySelectorAll('.skill-tag').forEach((tag, index) => {
+            tag.style.animationDelay = `${index * 0.1}s`;
+            tag.addEventListener('mouseenter', function() {
+                this.style.transform = 'scale(1.1) rotate(5deg)';
+            });
+            tag.addEventListener('mouseleave', function() {
+                this.style.transform = 'scale(1) rotate(0deg)';
+            });
+        });
+
+        // Add parallax effect to hero section
+        window.addEventListener('scroll', function() {
+            const scrolled = window.pageYOffset;
+            const parallax = document.querySelector('.hero');
+            const speed = scrolled * 0.5;
+            parallax.style.transform = `translateY(${speed}px)`;
+        });
+
+        // Interactive Transformer Visualization
+        class TransformerDemo {
+            constructor() {
+                this.currentStep = 0;
+                this.isPlaying = false;
+                this.tokens = [];
+                this.activeToken = null;
+                this.activeLayer = null;
+                this.attentionWeights = [];
+                
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.tokenizeInput();
+                this.generateAttentionMatrix();
+            }
+            
+            setupEventListeners() {
+                const input = document.getElementById('transformerInput');
+                const playBtn = document.getElementById('playBtn');
+                const stepBtn = document.getElementById('stepBtn');
+                const resetBtn = document.getElementById('resetBtn');
+                
+                input.addEventListener('input', () => this.tokenizeInput());
+                playBtn.addEventListener('click', () => this.togglePlay());
+                stepBtn.addEventListener('click', () => this.stepForward());
+                resetBtn.addEventListener('click', () => this.reset());
+                
+                // Layer click handlers
+                document.querySelectorAll('.layer').forEach(layer => {
+                    layer.addEventListener('click', (e) => this.selectLayer(e.target.closest('.layer')));
+                });
+            }
+            
+            tokenizeInput() {
+                const input = document.getElementById('transformerInput').value;
+                const tokens = input.split(' ').filter(token => token.length > 0);
+                this.tokens = tokens;
+                this.renderTokens();
+                this.generateAttentionMatrix();
+            }
+            
+            renderTokens() {
+                const container = document.getElementById('tokensContainer');
+                container.innerHTML = '';
+                
+                this.tokens.forEach((token, index) => {
+                    const tokenEl = document.createElement('div');
+                    tokenEl.className = 'token';
+                    tokenEl.textContent = token;
+                    tokenEl.addEventListener('click', () => this.selectToken(index));
+                    container.appendChild(tokenEl);
+                });
+            }
+            
+            generateAttentionMatrix() {
+                const matrix = document.getElementById('attentionMatrix');
+                matrix.innerHTML = '';
+                
+                if (this.tokens.length === 0) return;
+                
+                matrix.style.gridTemplateColumns = `repeat(${this.tokens.length}, 1fr)`;
+                
+                this.attentionWeights = [];
+                for (let i = 0; i < this.tokens.length; i++) {
+                    this.attentionWeights[i] = [];
+                    for (let j = 0; j < this.tokens.length; j++) {
+                        const weight = Math.random();
+                        this.attentionWeights[i][j] = weight;
+                        
+                        const cell = document.createElement('div');
+                        cell.className = 'attention-cell';
+                        cell.style.backgroundColor = `rgba(120, 219, 255, ${weight})`;
+                        cell.title = `Attention from "${this.tokens[i]}" to "${this.tokens[j]}": ${weight.toFixed(2)}`;
+                        matrix.appendChild(cell);
+                    }
+                }
+            }
+            
+            selectToken(index) {
+                // Clear previous selection
+                document.querySelectorAll('.token').forEach(token => token.classList.remove('active'));
+                
+                // Select new token
+                const tokens = document.querySelectorAll('.token');
+                tokens[index].classList.add('active');
+                this.activeToken = index;
+                
+                // Show attention for this token
+                this.showTokenAttention(index);
+                this.updateExplanation(`token-${index}`);
+            }
+            
+            selectLayer(layerEl) {
+                // Clear previous selection
+                document.querySelectorAll('.layer').forEach(layer => layer.classList.remove('active'));
+                
+                // Select new layer
+                layerEl.classList.add('active');
+                this.activeLayer = layerEl.dataset.layer;
+                this.updateExplanation(this.activeLayer);
+            }
+            
+            showTokenAttention(tokenIndex) {
+                const cells = document.querySelectorAll('.attention-cell');
+                const matrixSize = this.tokens.length;
+                
+                cells.forEach((cell, index) => {
+                    const row = Math.floor(index / matrixSize);
+                    const col = index % matrixSize;
+                    
+                    if (row === tokenIndex || col === tokenIndex) {
+                        cell.style.border = '2px solid #FF6B6B';
+                        cell.style.transform = 'scale(1.1)';
+                    } else {
+                        cell.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                        cell.style.transform = 'scale(1)';
+                    }
+                });
+            }
+            
+            togglePlay() {
+                const playBtn = document.getElementById('playBtn');
+                
+                if (this.isPlaying) {
+                    this.isPlaying = false;
+                    playBtn.textContent = '▶️ Play';
+                    clearInterval(this.playInterval);
+                } else {
+                    this.isPlaying = true;
+                    playBtn.textContent = '⏸️ Pause';
+                    this.playInterval = setInterval(() => this.stepForward(), 2000);
+                }
+            }
+            
+            stepForward() {
+                const layers = document.querySelectorAll('.layer');
+                const tokens = document.querySelectorAll('.token');
+                
+                // Clear previous highlights
+                layers.forEach(layer => layer.classList.remove('active'));
+                tokens.forEach(token => token.classList.remove('active'));
+                
+                // Highlight current step
+                if (this.currentStep < layers.length) {
+                    layers[this.currentStep].classList.add('active');
+                    this.activeLayer = layers[this.currentStep].dataset.layer;
+                    this.updateExplanation(this.activeLayer);
+                } else {
+                    // Cycle through tokens
+                    const tokenIndex = (this.currentStep - layers.length) % tokens.length;
+                    tokens[tokenIndex].classList.add('active');
+                    this.showTokenAttention(tokenIndex);
+                    this.updateExplanation(`token-${tokenIndex}`);
+                }
+                
+                this.currentStep = (this.currentStep + 1) % (layers.length + tokens.length);
+            }
+            
+            reset() {
+                this.currentStep = 0;
+                this.isPlaying = false;
+                document.getElementById('playBtn').textContent = '▶️ Play';
+                clearInterval(this.playInterval);
+                
+                // Clear all highlights
+                document.querySelectorAll('.layer').forEach(layer => layer.classList.remove('active'));
+                document.querySelectorAll('.token').forEach(token => token.classList.remove('active'));
+                document.querySelectorAll('.attention-cell').forEach(cell => {
+                    cell.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                    cell.style.transform = 'scale(1)';
+                });
+                
+                this.updateExplanation('intro');
+            }
+            
+            updateExplanation(type) {
+                const explanationText = document.getElementById('explanationText');
+                
+                const explanations = {
+                    'intro': 'Click on tokens or layers to explore how transformers process language. The attention mechanism helps the model understand relationships between words.',
+                    
+                    'embedding': 'The embedding layer converts each token into a high-dimensional vector representation. These vectors capture semantic meaning and allow the model to perform mathematical operations on words.',
+                    
+                    'attention': 'Multi-head attention calculates how much each token should "pay attention" to every other token in the sequence. The colored matrix shows attention weights - brighter colors indicate stronger connections.',
+                    
+                    'feedforward': 'The feed-forward network processes the attended information through multiple linear transformations and non-linear activations, allowing the model to learn complex patterns.',
+                    
+                    'output': 'The output layer transforms the processed representations into predictions. For language models, this typically produces probability distributions over the vocabulary.',
+                    
+                    'token-0': `Token "${this.tokens[0]}" is attending to other tokens. Notice how the attention pattern reveals which words are contextually related to "${this.tokens[0]}".`,
+                    
+                    'token-1': `The attention weights for "${this.tokens[1] || 'this token'}" show how transformers build understanding by connecting related concepts across the entire sequence.`,
+                    
+                    'token-2': `"${this.tokens[2] || 'This token'}" demonstrates how attention mechanisms allow transformers to capture long-range dependencies in text.`,
+                    
+                    'token-3': `The attention pattern for "${this.tokens[3] || 'this token'}" illustrates how transformers parallel process all positions simultaneously.`,
+                    
+                    'token-4': `"${this.tokens[4] || 'This token'}" shows how attention weights adapt based on context, enabling dynamic understanding of word relationships.`,
+                    
+                    'token-5': `The attention for "${this.tokens[5] || 'this token'}" demonstrates the model's ability to identify semantic connections across different parts of the input.`
+                };
+                
+                explanationText.textContent = explanations[type] || explanations['intro'];
+            }
+        }
+
+        // Initialize the transformer demo
+        document.addEventListener('DOMContentLoaded', function() {
+            new TransformerDemo();
+        });
+        
+
+        // Initialize attention visualization
+        // createAttentionVisualization();
+    </script>
+</body>
+</html>
